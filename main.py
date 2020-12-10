@@ -1,3 +1,5 @@
+import os
+
 import cv2
 import numpy as np
 import posenet as pn
@@ -287,10 +289,12 @@ def get_agitated_persons(persons, close_persons, frame_width, frame_height):
 if __name__ == "__main__":
     net = pn.initialize_network()
 
-    INPUT_VIDEO = cv2.VideoCapture("V_119.mp4")
+    INPUT_FILE_NAME = "V_119"
+    INPUT_VIDEO = cv2.VideoCapture("videos/" + INPUT_FILE_NAME + ".mp4")
     FRAME_WIDTH = int(INPUT_VIDEO.get(3))
     FRAME_HEIGHT = int(INPUT_VIDEO.get(4))
-    OUTPUT_VIDEO = cv2.VideoWriter("V_119_out.mp4", cv2.VideoWriter_fourcc(*'MP4V'), 10, (FRAME_WIDTH, FRAME_HEIGHT))
+    OUTPUT_VIDEO = cv2.VideoWriter("videos/" + INPUT_FILE_NAME + "_out.mp4", cv2.VideoWriter_fourcc(*'MP4V'), 10,
+                                   (FRAME_WIDTH, FRAME_HEIGHT))
 
     PERSON_TRACKER = []
     FRAME_COUNT = 0
@@ -357,6 +361,11 @@ if __name__ == "__main__":
                     cv2.rectangle(frameClone, (B[0], A[0]), (B[0] + bg_width, A[0] + bg_height), (0, 0, 255), -1)
                     cv2.putText(frameClone, "Threat", (B[0] + int(bg_width / 10), A[0] + int(bg_height / 1.5)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+                    # Save the frame containing a threat
+                    if INPUT_FILE_NAME not in os.listdir("videos"):
+                        os.mkdir("videos/" + INPUT_FILE_NAME)
+                    cv2.imwrite("videos/" + INPUT_FILE_NAME + "/" + INPUT_FILE_NAME + "_" + str(FRAME_COUNT) + ".jpg",
+                                frameClone)
                 # Uncomment to draw lines corresponding to the body of the persons:
                 # cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), pn.colors[o], 3, cv2.LINE_AA)
 
@@ -364,7 +373,7 @@ if __name__ == "__main__":
         # OUTPUT_VIDEO.write(frameClone)
 
         # Uncomment to display annotated frames:
-        # cv2.imshow("Detected Pose", frameClone)
+        cv2.imshow("Detected Pose", frameClone)
         if cv2.waitKey(1) == ord('q'):
             break
 
