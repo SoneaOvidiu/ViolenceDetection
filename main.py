@@ -2,9 +2,11 @@ import os
 
 import cv2
 import numpy as np
-import posenet as pn
+# STEP 1
+import openpose as op
 
 
+# STEP 2
 def validate_actual_person(key_points_to_validate):
     cont = 0
     for elem in key_points_to_validate:
@@ -13,6 +15,7 @@ def validate_actual_person(key_points_to_validate):
     return cont > 5
 
 
+# STEP 2
 def center_of_mass_for_person(key_points_for_person):
     cont_top = 0
     center_top = [0, 0]
@@ -41,6 +44,7 @@ def center_of_mass_for_person(key_points_for_person):
     return [(center_bottom[0] * 3 + center_top[0] * 2) / 5, (center_bottom[1] * 3 + center_top[1] * 2) / 5]
 
 
+# STEP 2
 def estimate_height(key_points_for_person):
     cont = 0
     r_sh_el_dist = 0
@@ -81,10 +85,12 @@ def estimate_height(key_points_for_person):
         return -1
 
 
+# STEP 2
 def distance_between_2_points(x0, y0, x1, y1):
     return np.sqrt((x0 - x1) ** 2 + (y0 - y1) ** 2)
 
 
+# STEP 2
 def map_persons(persons, found_persons):
     # persons = total no of distinct persons in the video (up to the current frame)
     # found_persons = number of distinct persons in the current frame
@@ -143,6 +149,7 @@ def map_persons(persons, found_persons):
     return persons
 
 
+# STEP 2
 def statistical_approach(person_tracker, found_persons, frame_count):
     actual_persons = []
     center_of_mass = []
@@ -162,6 +169,7 @@ def statistical_approach(person_tracker, found_persons, frame_count):
     return person_tracker
 
 
+# STEP 2
 def person_tracking(person_tracker, person_key_points, all_key_points, frame_count):
     found_persons = []
     for person in person_key_points:
@@ -175,6 +183,7 @@ def person_tracking(person_tracker, person_key_points, all_key_points, frame_cou
     return person_tracker
 
 
+# STEP 3
 def min_dist_between_persons_in_frame(frame_number, persons):
     distances = []
     for i in range(len(persons) - 1):
@@ -200,6 +209,7 @@ def min_dist_between_persons_in_frame(frame_number, persons):
     return distances
 
 
+# STEP 3
 def dist_between_centers_of_mass_for_persons(frame_number, persons):
     distances = []
     for i in range(len(persons) - 1):
@@ -216,17 +226,18 @@ def dist_between_centers_of_mass_for_persons(frame_number, persons):
     return distances
 
 
+# STEP 3
 def get_close_persons(min_dist, persons, frame_width, frame_height):
     valid = []
     for elem in min_dist:
-        if persons[elem[0]][0][len(persons[elem[0]][0]) - 1][20] / persons[elem[1]][0][len(persons[elem[1]][0]) - 1][
-            20] > 0.5 and persons[elem[0]][0][len(persons[elem[0]][0]) - 1][20] / \
+        if 0.5 < persons[elem[0]][0][len(persons[elem[0]][0]) - 1][20] / \
                 persons[elem[1]][0][len(persons[elem[1]][0]) - 1][20] < 2:
             if elem[4] < 10000 and elem[4] < frame_width * frame_height / 26331:
                 valid.append(elem)
     return valid
 
 
+# STEP 3
 def get_max_wrist_speed(person):
     last_seen_right_wrist = (-1, -1)
     last_seen_left_wrist = (-1, -1)
@@ -272,6 +283,7 @@ def get_max_wrist_speed(person):
     return max([dist1, dist2])
 
 
+# STEP 3
 def get_agitated_persons(persons, close_persons, frame_width, frame_height):
     to_return = []
     for elem in close_persons:
@@ -287,7 +299,7 @@ def get_agitated_persons(persons, close_persons, frame_width, frame_height):
 
 
 if __name__ == "__main__":
-    net = pn.initialize_network()
+    net = op.initialize_network()
 
     INPUT_FILE_NAME = "V_119"
     INPUT_VIDEO = cv2.VideoCapture("videos/" + INPUT_FILE_NAME + ".mp4")
@@ -319,10 +331,10 @@ if __name__ == "__main__":
         key_points_list = np.zeros((0, 3))
         keypoint_id = 0
         threshold = 0.1
-        for part in range(pn.nPoints):
+        for part in range(op.nPoints):
             probMap = output[0, part, :, :]
             probMap = cv2.resize(probMap, (image1.shape[1], image1.shape[0]))
-            key_points = pn.get_key_points(probMap, threshold)
+            key_points = op.get_key_points(probMap, threshold)
             key_points_with_id = []
             for o in range(len(key_points)):
                 key_points_with_id.append(key_points[o] + (keypoint_id,))
@@ -330,12 +342,13 @@ if __name__ == "__main__":
                 keypoint_id += 1
             detected_key_points.append(key_points_with_id)
         frameClone = image1.copy()
-        for o in range(pn.nPoints):
+        for o in range(op.nPoints):
             for m in range(len(detected_key_points[o])):
-                cv2.circle(frameClone, detected_key_points[o][m][0:2], 5, pn.colors[o], -1, cv2.LINE_AA)
+                cv2.circle(frameClone, detected_key_points[o][m][0:2], 5, op.colors[o], -1, cv2.LINE_AA)
 
-        valid_pairs, invalid_pairs = pn.get_valid_pairs(detected_key_points, output, FRAME_WIDTH, FRAME_HEIGHT)
-        person_wise_key_points = pn.get_person_wise_key_points(key_points_list, valid_pairs, invalid_pairs)
+        valid_pairs, invalid_pairs = op.get_valid_pairs(detected_key_points, output, FRAME_WIDTH, FRAME_HEIGHT)
+        person_wise_key_points = op.get_person_wise_key_points(key_points_list, valid_pairs, invalid_pairs)
+
         PERSON_TRACKER = person_tracking(PERSON_TRACKER, person_wise_key_points, detected_key_points, FRAME_COUNT)
 
         min_distances_between_persons = min_dist_between_persons_in_frame(FRAME_COUNT, PERSON_TRACKER)
@@ -350,7 +363,7 @@ if __name__ == "__main__":
         print("Violent persons in frame {}: {}".format(FRAME_COUNT, possible_violent_persons_ids))
         for o in range(17):
             for person_id in range(len(person_wise_key_points)):
-                INDEX = person_wise_key_points[person_id][np.array(pn.POSE_PAIRS[o])]
+                INDEX = person_wise_key_points[person_id][np.array(op.POSE_PAIRS[o])]
                 if -1 in INDEX:
                     continue
                 B = np.int32(key_points_list[INDEX.astype(int), 0])
