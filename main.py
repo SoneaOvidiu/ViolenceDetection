@@ -1,4 +1,6 @@
+import json
 import os
+from math import floor, ceil
 
 import cv2
 import numpy as np
@@ -298,98 +300,251 @@ def get_agitated_persons(persons, close_persons, frame_width, frame_height):
     return to_return
 
 
+# def test_on_119():
+#     net = op.initialize_network()
+#
+#     INPUT_FILE_NAME = "V_119"
+#     INPUT_VIDEO = cv2.VideoCapture("videos/" + INPUT_FILE_NAME + ".mp4")
+#     FRAME_WIDTH = int(INPUT_VIDEO.get(3))
+#     FRAME_HEIGHT = int(INPUT_VIDEO.get(4))
+#     OUTPUT_VIDEO = cv2.VideoWriter("videos/" + INPUT_FILE_NAME + "_out.mp4", cv2.VideoWriter_fourcc(*'MP4V'), 10,
+#                                    (FRAME_WIDTH, FRAME_HEIGHT))
+#
+#     PERSON_TRACKER = []
+#     FRAME_COUNT = 0
+#
+#     while INPUT_VIDEO.isOpened():
+#         FRAME_COUNT += 1
+#         # _, _ = video_file.read()
+#         ret, image1 = INPUT_VIDEO.read()
+#         # cv2.imshow("Unaltered", image1)
+#         if not ret:
+#             break
+#
+#         # Fix the input Height and get the width according to the Aspect Ratio
+#         inHeight = 368
+#         inWidth = int((inHeight / FRAME_HEIGHT) * FRAME_WIDTH)
+#         inpBlob = cv2.dnn.blobFromImage(image1, 1.0 / 255, (inWidth, inHeight), (0, 0, 0), swapRB=False, crop=False)
+#
+#         net.setInput(inpBlob)
+#         output = net.forward()
+#
+#         detected_key_points = []
+#         key_points_list = np.zeros((0, 3))
+#         keypoint_id = 0
+#         threshold = 0.1
+#         for part in range(op.nPoints):
+#             probMap = output[0, part, :, :]
+#             probMap = cv2.resize(probMap, (image1.shape[1], image1.shape[0]))
+#             key_points = op.get_key_points(probMap, threshold)
+#             key_points_with_id = []
+#             for o in range(len(key_points)):
+#                 key_points_with_id.append(key_points[o] + (keypoint_id,))
+#                 key_points_list = np.vstack([key_points_list, key_points[o]])
+#                 keypoint_id += 1
+#             detected_key_points.append(key_points_with_id)
+#         frameClone = image1.copy()
+#         for o in range(op.nPoints):
+#             for m in range(len(detected_key_points[o])):
+#                 cv2.circle(frameClone, detected_key_points[o][m][0:2], 5, op.colors[o], -1, cv2.LINE_AA)
+#
+#         valid_pairs, invalid_pairs = op.get_valid_pairs(detected_key_points, output, FRAME_WIDTH, FRAME_HEIGHT)
+#         person_wise_key_points = op.get_person_wise_key_points(key_points_list, valid_pairs, invalid_pairs)
+#
+#         PERSON_TRACKER = person_tracking(PERSON_TRACKER, person_wise_key_points, detected_key_points, FRAME_COUNT)
+#
+#         min_distances_between_persons = min_dist_between_persons_in_frame(FRAME_COUNT, PERSON_TRACKER)
+#         distances_between_centers_of_mass = dist_between_centers_of_mass_for_persons(FRAME_COUNT, PERSON_TRACKER)
+#
+#         persons_filtered_by_proximity = get_close_persons(min_distances_between_persons, PERSON_TRACKER,
+#                                                           FRAME_WIDTH, FRAME_HEIGHT)
+#         possible_violent_persons = get_agitated_persons(PERSON_TRACKER, persons_filtered_by_proximity,
+#                                                         FRAME_WIDTH, FRAME_HEIGHT)
+#
+#         possible_violent_persons_ids = [p[0] for p in possible_violent_persons]
+#         print("Violent persons in frame {}: {}".format(FRAME_COUNT, possible_violent_persons_ids))
+#         for o in range(17):
+#             for person_id in range(len(person_wise_key_points)):
+#                 INDEX = person_wise_key_points[person_id][np.array(op.POSE_PAIRS[o])]
+#                 if -1 in INDEX:
+#                     continue
+#                 B = np.int32(key_points_list[INDEX.astype(int), 0])
+#                 A = np.int32(key_points_list[INDEX.astype(int), 1])
+#                 if o == 0 and person_id in possible_violent_persons_ids:
+#                     bg_width = 100
+#                     bg_height = 35
+#                     cv2.rectangle(frameClone, (B[0], A[0]), (B[0] + bg_width, A[0] + bg_height), (0, 0, 255), -1)
+#                     cv2.putText(frameClone, "Threat", (B[0] + int(bg_width / 10), A[0] + int(bg_height / 1.5)),
+#                                 cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+#                     # Save the frame containing a threat
+#                     if INPUT_FILE_NAME not in os.listdir("videos"):
+#                         os.mkdir("videos/" + INPUT_FILE_NAME)
+#                     cv2.imwrite("videos/" + INPUT_FILE_NAME + "/" + INPUT_FILE_NAME + "_" + str(FRAME_COUNT) + ".jpg",
+#                                 frameClone)
+#                 # Uncomment to draw lines corresponding to the body of the persons:
+#                 # cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), pn.colors[o], 3, cv2.LINE_AA)
+#
+#         # Uncomment to save processed video to file:
+#         # OUTPUT_VIDEO.write(frameClone)
+#
+#         # Uncomment to display annotated frames:
+#         cv2.imshow("Detected Pose", frameClone)
+#         if cv2.waitKey(1) == ord('q'):
+#             break
+#
+#     INPUT_VIDEO.release()
+#     OUTPUT_VIDEO.release()
+#     cv2.destroyAllWindows()
+
+
+def compare_predictions(ground_truth, predictions):
+    tp = 0
+    fp = 0
+    fn = 0
+
+    for prediction in predictions:
+        found = False
+        for truth in ground_truth:
+            if truth[0] <= prediction <= truth[1]:
+                tp += 1
+                found = True
+                break
+        if not found:
+            fp += 1
+
+    for truth in ground_truth:
+        found = False
+        for prediction in predictions:
+            if truth[0] <= prediction <= truth[1]:
+                found = True
+                break
+        if not found:
+            fn += 1
+
+    return tp, fp, fn
+
+
 if __name__ == "__main__":
     net = op.initialize_network()
 
-    INPUT_FILE_NAME = "V_119"
-    INPUT_VIDEO = cv2.VideoCapture("videos/" + INPUT_FILE_NAME + ".mp4")
-    FRAME_WIDTH = int(INPUT_VIDEO.get(3))
-    FRAME_HEIGHT = int(INPUT_VIDEO.get(4))
-    OUTPUT_VIDEO = cv2.VideoWriter("videos/" + INPUT_FILE_NAME + "_out.mp4", cv2.VideoWriter_fourcc(*'MP4V'), 10,
-                                   (FRAME_WIDTH, FRAME_HEIGHT))
+    true_positives = 0
+    false_positives = 0
+    false_negatives = 0
 
-    PERSON_TRACKER = []
-    FRAME_COUNT = 0
+    file_names = [name[:-5] for name in os.listdir("CCTV") if name.endswith(".mpeg")]
+    with open('ground-truth.json') as json_file:
+        data = json.load(json_file)['database']
+        annotations = []
+        for n in file_names:
+            ann = data[n]['annotations']
+            annotations.append((n, [(floor(s['segment'][0]), ceil(s['segment'][1])) for s in ann]))
+            print(annotations[-1])
 
-    while INPUT_VIDEO.isOpened():
-        FRAME_COUNT += 1
-        # _, _ = video_file.read()
-        ret, image1 = INPUT_VIDEO.read()
-        # cv2.imshow("Unaltered", image1)
-        if not ret:
-            break
+    for video_index in range(len(file_names)):
+        INPUT_FILE_NAME = file_names[video_index]
+        INPUT_VIDEO = cv2.VideoCapture("CCTV/" + INPUT_FILE_NAME + ".mpeg")
+        FRAME_WIDTH = int(INPUT_VIDEO.get(3))
+        FRAME_HEIGHT = int(INPUT_VIDEO.get(4))
+        FPS = INPUT_VIDEO.get(cv2.CAP_PROP_FPS)
 
-        # Fix the input Height and get the width according to the Aspect Ratio
-        inHeight = 368
-        inWidth = int((inHeight / FRAME_HEIGHT) * FRAME_WIDTH)
-        inpBlob = cv2.dnn.blobFromImage(image1, 1.0 / 255, (inWidth, inHeight), (0, 0, 0), swapRB=False, crop=False)
+        PERSON_TRACKER = []
+        FRAME_COUNT = 0
 
-        net.setInput(inpBlob)
-        output = net.forward()
+        times_with_violent_persons = []
 
-        detected_key_points = []
-        key_points_list = np.zeros((0, 3))
-        keypoint_id = 0
-        threshold = 0.1
-        for part in range(op.nPoints):
-            probMap = output[0, part, :, :]
-            probMap = cv2.resize(probMap, (image1.shape[1], image1.shape[0]))
-            key_points = op.get_key_points(probMap, threshold)
-            key_points_with_id = []
-            for o in range(len(key_points)):
-                key_points_with_id.append(key_points[o] + (keypoint_id,))
-                key_points_list = np.vstack([key_points_list, key_points[o]])
-                keypoint_id += 1
-            detected_key_points.append(key_points_with_id)
-        frameClone = image1.copy()
-        for o in range(op.nPoints):
-            for m in range(len(detected_key_points[o])):
-                cv2.circle(frameClone, detected_key_points[o][m][0:2], 5, op.colors[o], -1, cv2.LINE_AA)
+        while INPUT_VIDEO.isOpened():
+            FRAME_COUNT += 1
+            ret, image1 = INPUT_VIDEO.read()
+            if not ret:
+                break
+            if (FRAME_COUNT - 1) % 5 == 0:
+                # Fix the input Height and get the width according to the Aspect Ratio
+                inHeight = 368
+                inWidth = int((inHeight / FRAME_HEIGHT) * FRAME_WIDTH)
+                inpBlob = cv2.dnn.blobFromImage(image1, 1.0 / 255, (inWidth, inHeight), (0, 0, 0), swapRB=False, crop=False)
 
-        valid_pairs, invalid_pairs = op.get_valid_pairs(detected_key_points, output, FRAME_WIDTH, FRAME_HEIGHT)
-        person_wise_key_points = op.get_person_wise_key_points(key_points_list, valid_pairs, invalid_pairs)
+                net.setInput(inpBlob)
+                output = net.forward()
 
-        PERSON_TRACKER = person_tracking(PERSON_TRACKER, person_wise_key_points, detected_key_points, FRAME_COUNT)
+                detected_key_points = []
+                key_points_list = np.zeros((0, 3))
+                keypoint_id = 0
+                threshold = 0.1
+                for part in range(op.nPoints):
+                    probMap = output[0, part, :, :]
+                    probMap = cv2.resize(probMap, (image1.shape[1], image1.shape[0]))
+                    key_points = op.get_key_points(probMap, threshold)
+                    key_points_with_id = []
+                    for o in range(len(key_points)):
+                        key_points_with_id.append(key_points[o] + (keypoint_id,))
+                        key_points_list = np.vstack([key_points_list, key_points[o]])
+                        keypoint_id += 1
+                    detected_key_points.append(key_points_with_id)
+                frameClone = image1.copy()
+                for o in range(op.nPoints):
+                    for m in range(len(detected_key_points[o])):
+                        cv2.circle(frameClone, detected_key_points[o][m][0:2], 5, op.colors[o], -1, cv2.LINE_AA)
 
-        min_distances_between_persons = min_dist_between_persons_in_frame(FRAME_COUNT, PERSON_TRACKER)
-        distances_between_centers_of_mass = dist_between_centers_of_mass_for_persons(FRAME_COUNT, PERSON_TRACKER)
+                valid_pairs, invalid_pairs = op.get_valid_pairs(detected_key_points, output, FRAME_WIDTH, FRAME_HEIGHT)
+                person_wise_key_points = op.get_person_wise_key_points(key_points_list, valid_pairs, invalid_pairs)
 
-        persons_filtered_by_proximity = get_close_persons(min_distances_between_persons, PERSON_TRACKER,
-                                                          FRAME_WIDTH, FRAME_HEIGHT)
-        possible_violent_persons = get_agitated_persons(PERSON_TRACKER, persons_filtered_by_proximity,
-                                                        FRAME_WIDTH, FRAME_HEIGHT)
+                PERSON_TRACKER = person_tracking(PERSON_TRACKER, person_wise_key_points, detected_key_points, FRAME_COUNT)
 
-        possible_violent_persons_ids = [p[0] for p in possible_violent_persons]
-        print("Violent persons in frame {}: {}".format(FRAME_COUNT, possible_violent_persons_ids))
-        for o in range(17):
-            for person_id in range(len(person_wise_key_points)):
-                INDEX = person_wise_key_points[person_id][np.array(op.POSE_PAIRS[o])]
-                if -1 in INDEX:
-                    continue
-                B = np.int32(key_points_list[INDEX.astype(int), 0])
-                A = np.int32(key_points_list[INDEX.astype(int), 1])
-                if o == 0 and person_id in possible_violent_persons_ids:
-                    bg_width = 100
-                    bg_height = 35
-                    cv2.rectangle(frameClone, (B[0], A[0]), (B[0] + bg_width, A[0] + bg_height), (0, 0, 255), -1)
-                    cv2.putText(frameClone, "Threat", (B[0] + int(bg_width / 10), A[0] + int(bg_height / 1.5)),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
-                    # Save the frame containing a threat
-                    if INPUT_FILE_NAME not in os.listdir("videos"):
-                        os.mkdir("videos/" + INPUT_FILE_NAME)
-                    cv2.imwrite("videos/" + INPUT_FILE_NAME + "/" + INPUT_FILE_NAME + "_" + str(FRAME_COUNT) + ".jpg",
-                                frameClone)
-                # Uncomment to draw lines corresponding to the body of the persons:
-                # cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), pn.colors[o], 3, cv2.LINE_AA)
+                min_distances_between_persons = min_dist_between_persons_in_frame(FRAME_COUNT, PERSON_TRACKER)
+                distances_between_centers_of_mass = dist_between_centers_of_mass_for_persons(FRAME_COUNT, PERSON_TRACKER)
 
-        # Uncomment to save processed video to file:
-        # OUTPUT_VIDEO.write(frameClone)
+                persons_filtered_by_proximity = get_close_persons(min_distances_between_persons, PERSON_TRACKER,
+                                                                  FRAME_WIDTH, FRAME_HEIGHT)
+                possible_violent_persons = get_agitated_persons(PERSON_TRACKER, persons_filtered_by_proximity,
+                                                                FRAME_WIDTH, FRAME_HEIGHT)
 
-        # Uncomment to display annotated frames:
-        cv2.imshow("Detected Pose", frameClone)
-        if cv2.waitKey(1) == ord('q'):
-            break
+                possible_violent_persons_ids = [p[0] for p in possible_violent_persons]
+                print("Violent persons in frame {}: {}".format(FRAME_COUNT, possible_violent_persons_ids))
 
-    INPUT_VIDEO.release()
-    OUTPUT_VIDEO.release()
-    cv2.destroyAllWindows()
+                if len(possible_violent_persons_ids):
+                    times_with_violent_persons.append(FRAME_COUNT / FPS)
+
+                for o in range(17):
+                    for person_id in range(len(person_wise_key_points)):
+                        INDEX = person_wise_key_points[person_id][np.array(op.POSE_PAIRS[o])]
+                        if -1 in INDEX:
+                            continue
+                        B = np.int32(key_points_list[INDEX.astype(int), 0])
+                        A = np.int32(key_points_list[INDEX.astype(int), 1])
+                        if o == 0 and person_id in possible_violent_persons_ids:
+                            bg_width = 100
+                            bg_height = 35
+                            cv2.rectangle(frameClone, (B[0], A[0]), (B[0] + bg_width, A[0] + bg_height), (0, 0, 255), -1)
+                            cv2.putText(frameClone, "Threat", (B[0] + int(bg_width / 10), A[0] + int(bg_height / 1.5)),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+                            # Save the frame containing a threat
+                            if INPUT_FILE_NAME not in os.listdir("CCTV/threats"):
+                                os.mkdir("CCTV/threats/" + INPUT_FILE_NAME)
+                            cv2.imwrite("CCTV/threats/" + INPUT_FILE_NAME + "/" + INPUT_FILE_NAME + "_" + str(FRAME_COUNT)
+                                        + ".jpg", frameClone)
+
+                        # Uncomment to draw lines corresponding to the body of the persons:
+                        # cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), pn.colors[o], 3, cv2.LINE_AA)
+
+                # Uncomment to display annotated frames:
+                # cv2.imshow("Detected Pose", frameClone)
+                # if cv2.waitKey(1) == ord('q'):
+                #     break
+
+        INPUT_VIDEO.release()
+        cv2.destroyAllWindows()
+
+        print(times_with_violent_persons)
+        TP, FP, FN = compare_predictions(annotations[video_index][1], times_with_violent_persons)
+        print(TP, FP, FN)
+        true_positives += TP
+        false_positives += FP
+        false_negatives += FN
+
+    print("TP =", true_positives)
+    print("FP =", false_positives)
+    print("FN =", false_negatives)
+    print("---")
+    print("Precision", true_positives / (true_positives + false_positives))
+    print("Recall", true_positives / (true_positives + false_negatives))
+    print("F1-score", true_positives / (true_positives + (false_positives + false_negatives) / 2))
