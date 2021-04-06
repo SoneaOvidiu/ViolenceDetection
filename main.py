@@ -398,9 +398,11 @@ def get_agitated_persons(persons, close_persons, frame_width, frame_height):
 
 
 def compare_predictions(ground_truth, predictions):
+    print(ground_truth, predictions)
     tp = 0
     fp = 0
     fn = 0
+    tn = 0
 
     for prediction in predictions:
         found = False
@@ -421,7 +423,14 @@ def compare_predictions(ground_truth, predictions):
         if not found:
             fn += 1
 
-    return tp, fp, fn
+    for i in range(1, len(ground_truth)):
+        if ground_truth[i][0] != ground_truth[i-1][1]:
+            tn += ground_truth[i][0] - ground_truth[i-1][1] - 1
+        else:
+            tn += ground_truth[i][0] - ground_truth[i-1][1]
+    tn -= fp
+
+    return tp, fp, fn, tn
 
 
 if __name__ == "__main__":
@@ -430,6 +439,7 @@ if __name__ == "__main__":
     true_positives = 0
     false_positives = 0
     false_negatives = 0
+    true_negatives = 0
 
     file_names = [name[:-5] for name in os.listdir("CCTV") if name.endswith(".mpeg")]
     with open('ground-truth.json') as json_file:
@@ -535,16 +545,20 @@ if __name__ == "__main__":
         cv2.destroyAllWindows()
 
         print(times_with_violent_persons)
-        TP, FP, FN = compare_predictions(annotations[video_index][1], times_with_violent_persons)
-        print(TP, FP, FN)
+        TP, FP, FN, TN = compare_predictions(annotations[video_index][1], times_with_violent_persons)
+        print(TP, FP, FN, TN)
         true_positives += TP
         false_positives += FP
         false_negatives += FN
+        true_negatives += TN
 
     print("TP =", true_positives)
     print("FP =", false_positives)
     print("FN =", false_negatives)
+    print("TN =", true_negatives)
     print("---")
+    print("Accuracy", (true_negatives + true_positives) / (true_negatives + true_positives + false_positives + false_negatives))
     print("Precision", true_positives / (true_positives + false_positives))
     print("Recall", true_positives / (true_positives + false_negatives))
     print("F1-score", true_positives / (true_positives + (false_positives + false_negatives) / 2))
+    # print(compare_predictions([(7, 11), (12, 14), (15, 21), (21, 30), (32, 35)], [8, 13]))
